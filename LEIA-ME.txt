@@ -1,0 +1,17 @@
+ROLETA DA DAILY — WINDOWS 11 (OFFLINE)
+
+O pacote contém o projeto-fonte para abrir a roleta em uma janela própria do Windows.
+A roleta em si funciona offline, sem enviar os nomes para servidores.
+
+Para compilar:
+1. Em um Windows 11, instale o .NET 8 SDK e o Microsoft Edge WebView2 Runtime.
+2. Extraia o ZIP e abra um terminal na pasta extraída.
+3. Execute:
+   dotnet publish -c Release -r win-x64 --self-contained true
+4. O executável e os arquivos necessários serão publicados em:
+   bin\Release\net8.0-windows\win-x64\publish\
+   Execute RoletaDaDaily.exe.
+
+A primeira compilação precisa de internet para baixar o pacote WebView2 via NuGet.
+Depois de compilado, o aplicativo roda offline. O runtime WebView2 deve estar instalado.
+Este ZIP fornece o projeto para compilar, não um .exe pré-compilado.
