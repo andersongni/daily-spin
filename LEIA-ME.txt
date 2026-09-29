@@ -43,6 +43,7 @@ ARQUIVOS DO PROJETO
 - ThemePalette.cs: paletas visuais e cores da interface.
 - ParticipantService.cs: leitura, limpeza e deduplicação de nomes.
 - SoundManager.cs: efeitos sonoros sintetizados localmente.
+- Assets\RoletaDaDaily.ico: ícone da roleta em vários tamanhos.
 - UserPreferences.cs: preferências visuais locais.
 - app.manifest: compatibilidade e identidade do aplicativo.
 

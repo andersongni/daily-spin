@@ -30,6 +30,7 @@ internal sealed class MainForm : Form
     public MainForm()
     {
         Text = "Roleta da Daily";
+        Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
         Name = "RoletaDaDailyMainForm";
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.Sizable;
