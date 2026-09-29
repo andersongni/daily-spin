@@ -11,17 +11,17 @@ internal sealed class MainForm : Form
     private readonly RoundedPanel _participantsCard = new();
     private readonly WheelControl _wheel = new();
     private readonly TextBox _namesBox = new();
-    private readonly ComboBox _themePicker = new();
-    private readonly ComboBox _soundPicker = new();
+    private readonly RoundedButton _themeButton = new();
+    private readonly RoundedButton _soundButton = new();
     private readonly RoundedButton _spinButton = new();
     private readonly RoundedButton _modeButton = new();
-    private readonly Label _countLabel = new();
     private readonly Label _duplicateStatus = new();
     private readonly List<Label> _labels = [];
     private readonly TableLayoutPanel _root;
     private IReadOnlyList<string> _participants = Array.Empty<string>();
     private AppTheme _appTheme;
     private int _themeIndex;
+    private int _soundIndex;
     private bool _lightMode;
     private bool _isSpinning;
     private bool _resultVisible;
@@ -42,7 +42,8 @@ internal sealed class MainForm : Form
         AutoScaleMode = AutoScaleMode.Dpi;
         AccessibleName = "Roleta da Daily";
 
-        _themeIndex = Math.Clamp(_preferences.ThemeIndex, 0, ThemePalette.All.Count - 1);
+        _themeIndex = Random.Shared.Next(ThemePalette.All.Count);
+        _soundIndex = Random.Shared.Next(SoundManager.Options.Count - 1);
         _lightMode = _preferences.LightMode;
         _appTheme = _lightMode ? AppTheme.Light : AppTheme.Dark;
 
@@ -61,15 +62,17 @@ internal sealed class MainForm : Form
 
         BuildHeader();
         BuildContent();
-        ConfigurePickers();
+        ConfigureCycleButtons();
 
         _wheel.SpinRequested += (_, _) => BeginSpin();
+        _wheel.SpinStopped += (_, _) => _soundManager.Stop();
         _wheel.SpinCompleted += (_, winner) => RevealWinner(winner);
         _namesBox.TextChanged += (_, _) => UpdateParticipants();
+        _namesBox.Leave += (_, _) => NormalizeNamesInEditor();
         _spinButton.Click += (_, _) => BeginSpin();
         _modeButton.Click += (_, _) => ToggleMode();
-        _themePicker.SelectionChangeCommitted += (_, _) => ChangeTheme();
-        _soundPicker.SelectionChangeCommitted += (_, _) => ChangeSound();
+        _themeButton.Click += (_, _) => ChangeTheme();
+        _soundButton.Click += (_, _) => ChangeSound();
         KeyDown += MainForm_KeyDown;
         FormClosed += (_, _) => { _wheel.CancelSpin(); _soundManager.Dispose(); };
 
@@ -89,8 +92,8 @@ internal sealed class MainForm : Form
             RowCount = 1,
             Margin = Padding.Empty
         };
-        header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 64));
-        header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 36));
+        header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 80));
+        header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20));
         _root.Controls.Add(header, 0, 0);
 
         var titleStack = new FlowLayoutPanel
@@ -121,18 +124,11 @@ internal sealed class MainForm : Form
             Padding = new Padding(0, 17, 0, 0)
         };
         _modeButton.Text = "☼  Modo claro";
-        _modeButton.Size = new Size(196, 48);
+        _modeButton.Size = new Size(180, 48);
         _modeButton.CornerRadius = 15;
         _modeButton.Font = new Font("Segoe UI Semibold", 10, FontStyle.Bold, GraphicsUnit.Point);
         _modeButton.Margin = new Padding(10, 0, 0, 0);
-        _countLabel.AutoSize = false;
-        _countLabel.Size = new Size(126, 46);
-        _countLabel.TextAlign = ContentAlignment.MiddleRight;
-        _countLabel.Font = new Font("Segoe UI Semibold", 11, FontStyle.Bold, GraphicsUnit.Point);
-        _countLabel.AccessibleName = "Contagem de participantes";
-        _countLabel.Margin = new Padding(0, 1, 0, 0);
         tools.Controls.Add(_modeButton);
-        tools.Controls.Add(_countLabel);
         header.Controls.Add(tools, 1, 0);
     }
 
@@ -241,14 +237,14 @@ internal sealed class MainForm : Form
         };
         options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        options.Controls.Add(CreatePicker("Tema da roleta", _themePicker), 0, 0);
-        options.Controls.Add(CreatePicker("Efeito sonoro", _soundPicker), 1, 0);
+        options.Controls.Add(CreateCycleButton("Tema da roleta", _themeButton), 0, 0);
+        options.Controls.Add(CreateCycleButton("Som da comemoração", _soundButton), 1, 0);
         side.Controls.Add(options, 0, 4);
         _participantsCard.Controls.Add(side);
         content.Controls.Add(_participantsCard, 1, 0);
     }
 
-    private Control CreatePicker(string caption, ComboBox picker)
+    private Control CreateCycleButton(string caption, RoundedButton button)
     {
         var stack = new TableLayoutPanel
         {
@@ -264,26 +260,24 @@ internal sealed class MainForm : Form
         label.Dock = DockStyle.Fill;
         label.TextAlign = ContentAlignment.MiddleLeft;
         label.Margin = new Padding(0);
-        picker.Dock = DockStyle.Fill;
-        picker.DropDownStyle = ComboBoxStyle.DropDownList;
-        picker.DrawMode = DrawMode.OwnerDrawFixed;
-        picker.ItemHeight = 25;
-        picker.IntegralHeight = false;
-        picker.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular, GraphicsUnit.Point);
-        picker.Margin = new Padding(0, 2, 0, 0);
-        picker.AccessibleName = caption;
-        picker.DrawItem += DrawPickerItem;
+        button.Dock = DockStyle.Fill;
+        button.CornerRadius = 10;
+        button.Font = new Font("Segoe UI Semibold", 9, FontStyle.Bold, GraphicsUnit.Point);
+        button.Margin = new Padding(0, 2, 0, 0);
+        button.TopColor = Color.FromArgb(41, 47, 64);
+        button.BottomColor = Color.FromArgb(33, 39, 55);
+        button.TextColor = _appTheme.Text;
+        button.BorderColor = _appTheme.PanelBorder;
+        button.AccessibleName = caption;
+        button.AccessibleDescription = "Clique para avançar para a próxima opção.";
         stack.Controls.Add(label, 0, 0);
-        stack.Controls.Add(picker, 0, 1);
+        stack.Controls.Add(button, 0, 1);
         return stack;
     }
 
-    private void ConfigurePickers()
+    private void ConfigureCycleButtons()
     {
-        foreach (ThemePalette palette in ThemePalette.All) _themePicker.Items.Add(palette.Name);
-        foreach (string sound in SoundManager.Options) _soundPicker.Items.Add(sound);
-        _themePicker.SelectedIndex = _themeIndex;
-        _soundPicker.SelectedIndex = Math.Clamp(_preferences.SoundIndex, 0, SoundManager.Options.Count - 1);
+        UpdateCycleButtonText();
     }
 
     private Label MakeLabel(string text, float size, bool bold, bool muted)
@@ -310,9 +304,18 @@ internal sealed class MainForm : Form
         _wheel.AccessibleDescription = _participants.Count == 0
             ? "A roleta está vazia. Adicione participantes e use o botão Girar a Roleta."
             : $"Roleta com {_participants.Count} participantes. Use o botão Girar a Roleta para sortear.";
-        _countLabel.Text = _participants.Count == 1 ? "1 participante" : $"{_participants.Count} participantes";
         UpdateDuplicateStatus(parsed.DuplicateCount);
         RefreshActionState();
+    }
+
+    private void NormalizeNamesInEditor()
+    {
+        string normalized = string.Join(Environment.NewLine,
+            _namesBox.Lines.Select(line => ParticipantService.NormalizeName(line.Trim())));
+        if (normalized == _namesBox.Text) return;
+        int selectionStart = Math.Min(_namesBox.SelectionStart, normalized.Length);
+        _namesBox.Text = normalized;
+        _namesBox.SelectionStart = selectionStart;
     }
 
     private void UpdateDuplicateStatus(int duplicateCount)
@@ -335,8 +338,8 @@ internal sealed class MainForm : Form
         _spinButton.Enabled = _participants.Count > 0 && !busy;
         _wheel.Enabled = _participants.Count > 0 && !busy;
         _namesBox.ReadOnly = busy;
-        _themePicker.Enabled = !busy;
-        _soundPicker.Enabled = !busy;
+        _themeButton.Enabled = !busy;
+        _soundButton.Enabled = !busy;
         _modeButton.Enabled = !busy;
         _spinButton.Cursor = _spinButton.Enabled ? Cursors.Hand : Cursors.Default;
         _wheel.Cursor = _wheel.Enabled ? Cursors.Hand : Cursors.Default;
@@ -349,15 +352,17 @@ internal sealed class MainForm : Form
         _wheel.Names = _participants.ToArray();
         _isSpinning = true;
         RefreshActionState();
+        _soundManager.PlaySpin((SpinSound)_soundIndex);
         _wheel.StartSpin();
     }
 
     private void RevealWinner(string winner)
     {
         _isSpinning = false;
+        _soundManager.Stop();
         _resultVisible = true;
         RefreshActionState();
-        _soundManager.Play((SpinSound)Math.Clamp(_soundPicker.SelectedIndex, 0, SoundManager.Options.Count - 1));
+        _soundManager.Play((SpinSound)_soundIndex);
 
         ResultAction action;
         using (var result = new ResultForm(this, winner, ThemePalette.All[_themeIndex], _appTheme))
@@ -381,19 +386,27 @@ internal sealed class MainForm : Form
 
     private void ChangeTheme()
     {
-        if (_initializing || _themePicker.SelectedIndex < 0) return;
-        _themeIndex = _themePicker.SelectedIndex;
-        _preferences.ThemeIndex = _themeIndex;
-        _preferences.Save();
+        if (_initializing) return;
+        _themeIndex = (_themeIndex + 1) % ThemePalette.All.Count;
+        UpdateCycleButtonText();
         _wheel.Palette = ThemePalette.All[_themeIndex];
         ApplyTheme();
     }
 
     private void ChangeSound()
     {
-        if (_initializing || _soundPicker.SelectedIndex < 0) return;
-        _preferences.SoundIndex = _soundPicker.SelectedIndex;
-        _preferences.Save();
+        if (_initializing) return;
+        _soundIndex = (_soundIndex + 1) % SoundManager.Options.Count;
+        UpdateCycleButtonText();
+    }
+
+    private void UpdateCycleButtonText()
+    {
+        _themeButton.Text = $"{ThemePalette.All[_themeIndex].Name}  ›";
+        string soundName = SoundManager.Options[_soundIndex];
+        _soundButton.Text = $"{soundName}  ›";
+        _themeButton.AccessibleDescription = $"Tema atual: {ThemePalette.All[_themeIndex].Name}. Clique para avançar.";
+        _soundButton.AccessibleDescription = $"Som atual: {soundName}. Clique para avançar.";
     }
 
     private void ToggleMode()
@@ -416,7 +429,6 @@ internal sealed class MainForm : Form
         _namesBox.BackColor = _appTheme.Field;
         _namesBox.ForeColor = _appTheme.Text;
         _namesBox.BorderStyle = BorderStyle.FixedSingle;
-        _countLabel.ForeColor = _appTheme.Text;
         foreach (Label label in _labels)
             label.ForeColor = Equals(label.Tag, "muted") ? _appTheme.Muted :
                 Equals(label.Tag, "accent") ? Color.FromArgb(235, 191, 110) : _appTheme.Text;
@@ -429,31 +441,22 @@ internal sealed class MainForm : Form
         _modeButton.BottomColor = _appTheme.Panel;
         _modeButton.BorderColor = _appTheme.PanelBorder;
         _modeButton.TextColor = _appTheme.Text;
-        _themePicker.BackColor = _appTheme.Field;
-        _themePicker.ForeColor = _appTheme.Text;
-        _soundPicker.BackColor = _appTheme.Field;
-        _soundPicker.ForeColor = _appTheme.Text;
+        _themeButton.TopColor = _appTheme.Field;
+        _themeButton.BottomColor = _appTheme.Field;
+        _themeButton.BorderColor = _appTheme.FieldBorder;
+        _themeButton.TextColor = _appTheme.Text;
+        _soundButton.TopColor = _appTheme.Field;
+        _soundButton.BottomColor = _appTheme.Field;
+        _soundButton.BorderColor = _appTheme.FieldBorder;
+        _soundButton.TextColor = _appTheme.Text;
         UpdateDuplicateStatus(ParticipantService.Parse(_namesBox.Text).DuplicateCount);
         Invalidate(true);
         _wheel.Invalidate();
     }
 
-    private void DrawPickerItem(object? sender, DrawItemEventArgs e)
-    {
-        if (sender is not ComboBox picker || e.Index < 0) return;
-        bool selected = (e.State & DrawItemState.Selected) != 0;
-        Color back = selected ? _appTheme.Selection : _appTheme.Field;
-        using var brush = new SolidBrush(back);
-        e.Graphics.FillRectangle(brush, e.Bounds);
-        TextRenderer.DrawText(e.Graphics, picker.Items[e.Index]?.ToString() ?? string.Empty, picker.Font,
-            Rectangle.Inflate(e.Bounds, -7, 0), _appTheme.Text,
-            TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
-        e.DrawFocusRectangle();
-    }
-
     private void MainForm_KeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.KeyCode != Keys.Enter || _namesBox.Focused || _themePicker.Focused || _soundPicker.Focused ||
+        if (e.KeyCode != Keys.Enter || _namesBox.Focused || _themeButton.Focused || _soundButton.Focused ||
             _isSpinning || _resultVisible || _participants.Count == 0)
             return;
         BeginSpin();

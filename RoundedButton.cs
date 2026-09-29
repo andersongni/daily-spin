@@ -4,6 +4,7 @@ namespace RoletaDaDaily;
 
 internal sealed class RoundedButton : Control
 {
+    private Region? _roundedRegion;
     private bool _hovered;
     private bool _pressed;
     private Color _topColor = Color.FromArgb(235, 188, 100);
@@ -14,9 +15,11 @@ internal sealed class RoundedButton : Control
     public RoundedButton()
     {
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
-                 ControlStyles.ResizeRedraw | ControlStyles.UserPaint | ControlStyles.Selectable, true);
+                 ControlStyles.ResizeRedraw | ControlStyles.UserPaint | ControlStyles.Selectable |
+                 ControlStyles.SupportsTransparentBackColor, true);
         SetStyle(ControlStyles.StandardClick, false);
         TabStop = true;
+        BackColor = Color.Transparent;
         AccessibleRole = AccessibleRole.PushButton;
         Cursor = Cursors.Hand;
         Font = new Font("Segoe UI Semibold", 10.5f, FontStyle.Bold, GraphicsUnit.Point);
@@ -28,6 +31,22 @@ internal sealed class RoundedButton : Control
     public Color BorderColor { get => _borderColor; set { _borderColor = value; Invalidate(); } }
     public Color TextColor { get => _textColor; set { _textColor = value; Invalidate(); } }
     public int CornerRadius { get; set; } = 15;
+
+    protected override void OnSizeChanged(EventArgs e)
+    {
+        base.OnSizeChanged(e);
+        UpdateRoundedRegion();
+    }
+
+    private void UpdateRoundedRegion()
+    {
+        if (Width < 2 || Height < 2) return;
+        using GraphicsPath path = ThemePalette.RoundedRectangle(new RectangleF(0, 0, Width, Height), CornerRadius);
+        var nextRegion = new Region(path);
+        Region = nextRegion;
+        _roundedRegion?.Dispose();
+        _roundedRegion = nextRegion;
+    }
 
     protected override void OnTextChanged(EventArgs e)
     {
@@ -117,5 +136,16 @@ internal sealed class RoundedButton : Control
         TextRenderer.DrawText(e.Graphics, Text, Font, textBounds, text,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
             TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            Region = null;
+            _roundedRegion?.Dispose();
+            _roundedRegion = null;
+        }
+        base.Dispose(disposing);
     }
 }

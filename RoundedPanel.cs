@@ -4,6 +4,8 @@ namespace RoletaDaDaily;
 
 internal sealed class RoundedPanel : Panel
 {
+    private Region? _roundedRegion;
+
     public RoundedPanel()
     {
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
@@ -13,6 +15,22 @@ internal sealed class RoundedPanel : Panel
 
     public Color BorderColor { get; set; } = Color.FromArgb(60, 70, 90);
     public int CornerRadius { get; set; } = 18;
+
+    protected override void OnSizeChanged(EventArgs e)
+    {
+        base.OnSizeChanged(e);
+        UpdateRoundedRegion();
+    }
+
+    private void UpdateRoundedRegion()
+    {
+        if (Width < 2 || Height < 2) return;
+        using GraphicsPath path = ThemePalette.RoundedRectangle(new RectangleF(0, 0, Width, Height), CornerRadius);
+        var nextRegion = new Region(path);
+        Region = nextRegion;
+        _roundedRegion?.Dispose();
+        _roundedRegion = nextRegion;
+    }
 
     protected override void OnPaintBackground(PaintEventArgs e)
     {
@@ -33,5 +51,16 @@ internal sealed class RoundedPanel : Panel
         using var border = new Pen(BorderColor, 1);
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         e.Graphics.DrawPath(border, path);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            Region = null;
+            _roundedRegion?.Dispose();
+            _roundedRegion = null;
+        }
+        base.Dispose(disposing);
     }
 }

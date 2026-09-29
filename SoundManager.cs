@@ -17,6 +17,7 @@ internal sealed class SoundManager : IDisposable
     private const uint SndAsync = 0x0001;
     private const uint SndNoDefault = 0x0002;
     private const uint SndMemory = 0x0004;
+    private const double WheelDurationSeconds = 5.2;
     private static readonly string[] SoundNames = ["Cassino", "Arcade 8-bit", "Sinos", "Fanfarra", "Desligado"];
     private readonly object _gate = new();
     private byte[]? _wave;
@@ -33,16 +34,35 @@ internal sealed class SoundManager : IDisposable
 
     public void Play(SpinSound sound)
     {
+        if (sound == SpinSound.Off)
+        {
+            Stop();
+            return;
+        }
+        PlayWave(CreateCelebrationWave(sound));
+    }
+
+    public void PlaySpin(SpinSound sound)
+    {
+        if (sound == SpinSound.Off)
+        {
+            Stop();
+            return;
+        }
+        PlayWave(CreateWheelSpinWave());
+    }
+
+    private void PlayWave(byte[] wave)
+    {
         lock (_gate)
         {
             if (_disposed) return;
             StopLocked();
-            if (sound == SpinSound.Off) return;
 
-            byte[] wave = CreateWave(sound);
             _wave = wave;
             _pinnedWave = GCHandle.Alloc(wave, GCHandleType.Pinned);
-            if (!PlaySound(_pinnedWave.AddrOfPinnedObject(), IntPtr.Zero, SndAsync | SndMemory | SndNoDefault))
+            uint flags = SndAsync | SndMemory | SndNoDefault;
+            if (!PlaySound(_pinnedWave.AddrOfPinnedObject(), IntPtr.Zero, flags))
             {
                 _pinnedWave.Free();
                 _wave = null;
@@ -86,16 +106,53 @@ internal sealed class SoundManager : IDisposable
         _wave = null;
     }
 
-    private static byte[] CreateWave(SpinSound sound)
+    private static byte[] CreateWheelSpinWave()
     {
-        const double duration = 1.45;
+        int sampleCount = (int)(SampleRate * WheelDurationSeconds);
+        using var stream = new MemoryStream(44 + sampleCount * 2);
+        using var writer = new BinaryWriter(stream);
+        WriteWaveHeader(writer, sampleCount);
+
+        var random = new Random();
+        double nextTick = 0;
+        double tickAge = -1;
+        double tickFrequency = 1700;
+        double motorPhase = 0;
+        for (int i = 0; i < sampleCount; i++)
+        {
+            double t = i / (double)SampleRate;
+            double progress = t / WheelDurationSeconds;
+            double speed = Math.Sin(Math.PI * progress);
+            if (t >= nextTick)
+            {
+                tickAge = 0;
+                tickFrequency = 1450 + random.Next(900);
+                nextTick = t + 0.055 + (1 - speed) * 0.26;
+            }
+
+            double value = 0;
+            if (tickAge >= 0 && tickAge < 0.028)
+            {
+                double decay = Math.Exp(-tickAge * 210);
+                value += (Math.Sin(2 * Math.PI * tickFrequency * tickAge) * 0.38 +
+                          (random.NextDouble() - 0.5) * 0.24) * decay;
+                tickAge += 1.0 / SampleRate;
+            }
+
+            motorPhase += 2 * Math.PI * (95 + speed * 115) / SampleRate;
+            value += Math.Sin(motorPhase) * speed * 0.035;
+            writer.Write((short)(Math.Clamp(value, -0.92, 0.92) * short.MaxValue));
+        }
+        return stream.ToArray();
+    }
+
+    private static byte[] CreateCelebrationWave(SpinSound sound)
+    {
+        const double duration = 1.55;
         int sampleCount = (int)(SampleRate * duration);
         using var stream = new MemoryStream(44 + sampleCount * 2);
         using var writer = new BinaryWriter(stream);
-        writer.Write("RIFF"u8); writer.Write(36 + sampleCount * 2); writer.Write("WAVE"u8);
-        writer.Write("fmt "u8); writer.Write(16); writer.Write((short)1); writer.Write((short)1);
-        writer.Write(SampleRate); writer.Write(SampleRate * 2); writer.Write((short)2); writer.Write((short)16);
-        writer.Write("data"u8); writer.Write(sampleCount * 2);
+        WriteWaveHeader(writer, sampleCount);
 
         var random = new Random((int)sound * 173 + 29);
         double[] notes = sound switch
@@ -134,6 +191,14 @@ internal sealed class SoundManager : IDisposable
             writer.Write(sample);
         }
         return stream.ToArray();
+    }
+
+    private static void WriteWaveHeader(BinaryWriter writer, int sampleCount)
+    {
+        writer.Write("RIFF"u8); writer.Write(36 + sampleCount * 2); writer.Write("WAVE"u8);
+        writer.Write("fmt "u8); writer.Write(16); writer.Write((short)1); writer.Write((short)1);
+        writer.Write(SampleRate); writer.Write(SampleRate * 2); writer.Write((short)2); writer.Write((short)16);
+        writer.Write("data"u8); writer.Write(sampleCount * 2);
     }
 
     public void Dispose()

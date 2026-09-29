@@ -42,7 +42,7 @@ internal sealed class ResultForm : Form
         _removeButton.Click += (_, _) => Choose(ResultAction.RemoveAndReturn);
         _againButton.Click += (_, _) => Choose(ResultAction.SpinAgain);
         _returnButton.Click += (_, _) => Choose(ResultAction.Return);
-        Controls.AddRange([_removeButton, _againButton, _returnButton]);
+        _canvas.Controls.AddRange([_removeButton, _againButton, _returnButton]);
         _removeButton.BringToFront();
         _againButton.BringToFront();
         _returnButton.BringToFront();

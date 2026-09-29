@@ -32,6 +32,7 @@ internal sealed class WheelControl : Control
     }
 
     public event EventHandler? SpinRequested;
+    public event EventHandler? SpinStopped;
     public event Action<object?, string>? SpinCompleted;
     public bool IsSpinning { get; private set; }
     public IReadOnlyList<string> Names { get => _names; set { _names = value ?? Array.Empty<string>(); Invalidate(); } }
@@ -80,6 +81,7 @@ internal sealed class WheelControl : Control
             _waitingForReveal = true;
             _revealTimer.Start();
             Invalidate();
+            SpinStopped?.Invoke(this, EventArgs.Empty);
             return;
         }
         Invalidate();

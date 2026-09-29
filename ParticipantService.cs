@@ -1,9 +1,13 @@
+using System.Globalization;
+
 namespace RoletaDaDaily;
 
 internal sealed record ParticipantParseResult(IReadOnlyList<string> Names, int DuplicateCount);
 
 internal static class ParticipantService
 {
+    private static readonly TextInfo PortugueseTextInfo = CultureInfo.GetCultureInfo("pt-BR").TextInfo;
+
     public static ParticipantParseResult Parse(string? input)
     {
         var names = new List<string>();
@@ -12,7 +16,7 @@ internal static class ParticipantService
 
         foreach (string line in (input ?? string.Empty).Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
         {
-            string name = line.Trim();
+            string name = NormalizeName(line.Trim());
             if (name.Length == 0)
                 continue;
 
@@ -24,6 +28,9 @@ internal static class ParticipantService
 
         return new ParticipantParseResult(names, duplicates);
     }
+
+    public static string NormalizeName(string name) =>
+        PortugueseTextInfo.ToTitleCase(name.ToLower(CultureInfo.GetCultureInfo("pt-BR")));
 
     public static string Format(IEnumerable<string> names) => string.Join(Environment.NewLine, names);
 }
