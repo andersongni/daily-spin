@@ -8,19 +8,20 @@ internal sealed class ResultForm : Form
     private readonly RoundedButton _removeButton;
     private readonly RoundedButton _againButton;
     private readonly RoundedButton _returnButton;
+    private readonly Dictionary<RoundedButton, Font> _scaledFonts = [];
     private bool _actionChosen;
 
-    public ResultForm(Form owner, string winner, ThemePalette palette, AppTheme appTheme)
+    public ResultForm(string winner, ThemePalette palette, AppTheme appTheme)
     {
+        TopLevel = false;
         FormBorderStyle = FormBorderStyle.None;
+        Dock = DockStyle.Fill;
         ShowInTaskbar = false;
-        StartPosition = FormStartPosition.Manual;
         KeyPreview = true;
-        TopMost = false;
         DoubleBuffered = true;
+        TabStop = true;
         AccessibleName = "Resultado do sorteio";
-        AccessibleDescription = $"O próximo a falar é {winner}.";
-        Bounds = owner.RectangleToScreen(owner.ClientRectangle);
+        AccessibleDescription = $"O próximo a falar é {winner}. Fale o que pretende fazer nos próximos dias e se há algum impedimento.";
 
         _canvas = new ConfettiControl
         {
@@ -28,16 +29,17 @@ internal sealed class ResultForm : Form
             Winner = winner,
             Palette = palette,
             LightMode = appTheme.IsLight,
+            Theme = appTheme,
             AccessibleName = $"E o próximo a falar é {winner}"
         };
         Controls.Add(_canvas);
 
         _removeButton = NewButton("Remover sorteado e voltar", appTheme.Gold, appTheme.GoldDark,
-            Color.FromArgb(38, 29, 21), 17);
+            Color.FromArgb(38, 29, 21), 17, "\uE74D");
         _againButton = NewButton("Sortear novamente (manter nome)", appTheme.Panel, appTheme.Panel,
-            appTheme.Text, 13);
+            appTheme.Text, 13, "\uE7A7");
         _returnButton = NewButton("Voltar sem remover", appTheme.Panel, appTheme.Panel,
-            appTheme.Text, 13);
+            appTheme.Text, 13, "\uE72B");
         _againButton.BorderColor = _returnButton.BorderColor = appTheme.PanelBorder;
         _removeButton.Click += (_, _) => Choose(ResultAction.RemoveAndReturn);
         _againButton.Click += (_, _) => Choose(ResultAction.SpinAgain);
@@ -50,7 +52,6 @@ internal sealed class ResultForm : Form
         KeyDown += ResultForm_KeyDown;
         Shown += (_, _) =>
         {
-            Bounds = owner.RectangleToScreen(owner.ClientRectangle);
             LayoutButtons();
             _canvas.StartAnimation();
             _removeButton.Focus();
@@ -61,13 +62,15 @@ internal sealed class ResultForm : Form
 
     public ResultAction Action { get; private set; }
 
-    private static RoundedButton NewButton(string text, Color top, Color bottom, Color textColor, float fontSize) => new()
+    private static RoundedButton NewButton(string text, Color top, Color bottom, Color textColor,
+        float fontSize, string iconGlyph) => new()
     {
         Text = text,
         TopColor = top,
         BottomColor = bottom,
         BorderColor = ThemePalette.Lighten(top, 0.26f),
         TextColor = textColor,
+        IconGlyph = iconGlyph,
         Font = new Font("Segoe UI Semibold", fontSize, FontStyle.Bold, GraphicsUnit.Point),
         CornerRadius = 16,
         AccessibleName = text,
@@ -76,13 +79,47 @@ internal sealed class ResultForm : Form
 
     private void LayoutButtons()
     {
-        int margin = Math.Max(24, ClientSize.Width / 35);
-        int gap = 12;
-        int width = Math.Max(100, ClientSize.Width - margin * 2);
-        _removeButton.Bounds = new Rectangle(margin, ClientSize.Height - 144, width, 56);
+        if (ClientSize.Width < 2 || ClientSize.Height < 2) return;
+
+        float dpi = DeviceDpi / 96f;
+        float logicalWidth = ClientSize.Width / dpi;
+        float logicalHeight = ClientSize.Height / dpi;
+        float s = Math.Clamp(MathF.Min(logicalWidth / 1120f, logicalHeight / 760f), 0.46f, 1f);
+
+        int Px(float value) => Math.Max(1, (int)MathF.Round(value * s * dpi));
+
+        int margin = Math.Max(Px(24), ClientSize.Width / 40);
+        int gap = Px(12);
+        int width = Math.Max(80, ClientSize.Width - margin * 2);
+        int removeHeight = Px(56);
+        int secondaryHeight = Px(52);
+        int bottomPad = Px(24);
+
+        int secondaryTop = ClientSize.Height - bottomPad - secondaryHeight;
+        int removeTop = secondaryTop - gap - removeHeight;
+        _removeButton.Bounds = new Rectangle(margin, removeTop, width, removeHeight);
+
         int half = (width - gap) / 2;
-        _againButton.Bounds = new Rectangle(margin, ClientSize.Height - 75, half, 52);
-        _returnButton.Bounds = new Rectangle(margin + half + gap, ClientSize.Height - 75, width - half - gap, 52);
+        _againButton.Bounds = new Rectangle(margin, secondaryTop, half, secondaryHeight);
+        _returnButton.Bounds = new Rectangle(margin + half + gap, secondaryTop, width - half - gap, secondaryHeight);
+
+        ApplyScaledFont(_removeButton, 17f, s);
+        ApplyScaledFont(_againButton, 13f, s);
+        ApplyScaledFont(_returnButton, 13f, s);
+        _removeButton.CornerRadius = _againButton.CornerRadius = _returnButton.CornerRadius = Px(16);
+
+        _canvas.ReservedBottom = ClientSize.Height - removeTop + Px(8);
+        _canvas.Invalidate();
+    }
+
+    private void ApplyScaledFont(RoundedButton button, float basePoints, float scale)
+    {
+        float size = MathF.Max(6.5f, MathF.Round(basePoints * scale, 1));
+        if (Math.Abs(button.Font.Size - size) < 0.05f) return;
+        var next = new Font(button.Font.FontFamily, size, FontStyle.Bold, GraphicsUnit.Point);
+        button.Font = next;
+        if (_scaledFonts.Remove(button, out Font? previous)) previous.Dispose();
+        _scaledFonts[button] = next;
     }
 
     private void Choose(ResultAction action)
@@ -91,7 +128,6 @@ internal sealed class ResultForm : Form
         _actionChosen = true;
         Action = action;
         _removeButton.Enabled = _againButton.Enabled = _returnButton.Enabled = false;
-        DialogResult = DialogResult.OK;
         Close();
     }
 
@@ -100,14 +136,18 @@ internal sealed class ResultForm : Form
         if (e.KeyCode != Keys.Escape || _actionChosen) return;
         _actionChosen = true;
         Action = ResultAction.Return;
-        DialogResult = DialogResult.Cancel;
         e.Handled = true;
         Close();
     }
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing) _canvas.StopAnimation();
+        if (disposing)
+        {
+            _canvas.StopAnimation();
+            foreach (Font font in _scaledFonts.Values) font.Dispose();
+            _scaledFonts.Clear();
+        }
         base.Dispose(disposing);
     }
 }

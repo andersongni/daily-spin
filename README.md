@@ -9,6 +9,15 @@ Aplicativo desktop nativo para Windows que sorteia quem falará a seguir na dail
 
 A publicação autocontida incluída no pacote pode ser executada sem instalar o .NET.
 
+## Downloads (GitHub Releases)
+
+Cada release publica dois arquivos:
+
+- `RoletaDaDaily.exe` — execução direta no Windows 10/11 (64 bits), sem instalar o .NET.
+- `RoletaDaDaily-win-x64.zip` — use este arquivo se o navegador bloquear o download do executável. Extraia e abra `RoletaDaDaily.exe`.
+
+Para gerar uma release: crie uma tag (ex.: `v1.0.0`) e publique a release no GitHub; o workflow `.github/workflows/release.yml` compila, anexa os dois artefatos e acrescenta essa orientação nas notas.
+
 ## Executar
 
 Abra `RoletaDaDaily.exe`. Para compilar e publicar uma nova versão no Windows, execute na pasta do projeto:

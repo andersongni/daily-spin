@@ -110,7 +110,7 @@ internal sealed class WheelControl : Control
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.PixelOffsetMode = PixelOffsetMode.HighQuality;
         g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-        float radius = Math.Max(60, Math.Min(Width, Height) * 0.44f - 18);
+        float radius = Math.Max(36, Math.Min(Width, Height) * 0.44f - Math.Min(18, Math.Min(Width, Height) * 0.04f));
         float cx = Width / 2f, cy = Height / 2f + 1;
         RectangleF circle = new(cx - radius, cy - radius, radius * 2, radius * 2);
 
@@ -128,7 +128,7 @@ internal sealed class WheelControl : Control
             g.FillEllipse(ring, outer);
         using (var line = new Pen(Color.FromArgb(220, Color.White), 1.1f))
             g.DrawEllipse(line, outer.X + 2, outer.Y + 2, outer.Width - 4, outer.Height - 4);
-        using (var plate = new SolidBrush(Color.FromArgb(21, 25, 38)))
+        using (var plate = new SolidBrush(_palette.HubEnd))
             g.FillEllipse(plate, circle);
 
         if (_names.Count == 0)

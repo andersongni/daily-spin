@@ -1,0 +1,94 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag da release existente (ex: v1.0.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Publish self-contained exe
+        run: >
+          dotnet publish RoletaDaDaily.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:DebugType=None
+          -p:DebugSymbols=false
+          -o artifacts/publish
+
+      - name: Pack zip and stage assets
+        shell: pwsh
+        run: |
+          @"
+          ROLETA DA DAILY
+
+          Este ZIP existe para o caso de o navegador bloquear o download do executável (.exe).
+          Extraia todos os arquivos desta pasta e abra RoletaDaDaily.exe.
+
+          Requisitos: Windows 10 ou Windows 11, 64 bits. Não é necessário instalar o .NET.
+          "@ | Set-Content -Path artifacts/publish/LEIA-ME.txt -Encoding utf8
+
+          Compress-Archive -Path artifacts/publish\* -DestinationPath artifacts/RoletaDaDaily-win-x64.zip -Force
+          Copy-Item artifacts/publish/RoletaDaDaily.exe artifacts/RoletaDaDaily.exe -Force
+
+      - name: Upload assets and update release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $tag = if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            "${{ inputs.tag }}"
+          } else {
+            "${{ github.event.release.tag_name }}"
+          }
+
+          if (-not $tag) { throw "Tag da release não encontrada." }
+
+          gh release upload $tag `
+            artifacts/RoletaDaDaily.exe `
+            artifacts/RoletaDaDaily-win-x64.zip `
+            --clobber
+
+          $existing = gh release view $tag --json body -q .body
+          if ($existing -match 'RoletaDaDaily-win-x64\.zip') {
+            Write-Host "Notas da release já mencionam o ZIP; mantendo o texto atual."
+            exit 0
+          }
+
+          $downloads = @"
+
+          ---
+
+          ## Downloads
+
+          - **RoletaDaDaily.exe** — execute direto no Windows 10/11 (64 bits). Não precisa instalar o .NET.
+          - **RoletaDaDaily-win-x64.zip** — use este arquivo se o navegador bloquear o download do executável. Extraia e abra ``RoletaDaDaily.exe``.
+          "@
+
+          $notes = if ([string]::IsNullOrWhiteSpace($existing)) {
+            $downloads.Trim()
+          } else {
+            $existing.TrimEnd() + $downloads
+          }
+
+          gh release edit $tag --notes $notes

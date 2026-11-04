@@ -13,6 +13,7 @@ internal sealed record ThemePalette(
 {
     public static IReadOnlyList<ThemePalette> All { get; } = new[]
     {
+        Signature,
         Make("Cassino clássico", ["#7B202D", "#173E3B", "#BD8B35", "#253554", "#6A2F62", "#315C4D"]),
         Make("Neon cyberpunk", ["#111A43", "#6C1BE6", "#00A8A8", "#DB147B", "#254BE8", "#8A3CF1"]),
         Make("Pastel suave", ["#D9A9B7", "#A9CBD1", "#E9CD8C", "#B8B0DD", "#B7D1A6", "#E4B99C"]),
@@ -26,6 +27,18 @@ internal sealed record ThemePalette(
         Make("Tons terrosos", ["#604534", "#93623D", "#AD884F", "#63734F", "#855A5D", "#52646B"]),
         Make("Gelo e prata", ["#56718B", "#87A8B8", "#A7BBC5", "#496185", "#7895A7", "#617B9E"])
     };
+
+    /// <summary>Identidade visual do aplicativo: azul-marinho com aro dourado.</summary>
+    private static ThemePalette Signature => new(
+        "Azul e dourado",
+        new[] { "#142C63", "#1E4489", "#0F2350", "#2A5AA8", "#18376E", "#23498C" }
+            .Select(ParseHex).ToArray(),
+        ParseHex("#F5C542"),
+        ParseHex("#B8891F"),
+        ParseHex("#1E4489"),
+        ParseHex("#0B1836"),
+        new[] { "#F5C542", "#F7E6B8", "#2FB3B3", "#2A5AA8", "#E0609A", "#F3F0E6" }
+            .Select(ParseHex).ToArray());
 
     private static ThemePalette Make(string name, string[] colors)
     {
@@ -75,14 +88,14 @@ internal readonly record struct AppTheme(
     bool IsLight)
 {
     public static AppTheme Dark => new(
-        Color.FromArgb(29, 24, 49), Color.FromArgb(13, 19, 32), Color.FromArgb(28, 34, 49),
-        Color.FromArgb(63, 67, 87), Color.FromArgb(245, 242, 250), Color.FromArgb(166, 169, 187),
-        Color.FromArgb(19, 25, 38), Color.FromArgb(57, 63, 80), Color.FromArgb(236, 190, 104),
-        Color.FromArgb(179, 126, 48), Color.FromArgb(93, 76, 123), false);
+        Color.FromArgb(16, 34, 79), Color.FromArgb(7, 15, 43), Color.FromArgb(20, 41, 92),
+        Color.FromArgb(44, 79, 147), Color.FromArgb(241, 245, 255), Color.FromArgb(155, 176, 216),
+        Color.FromArgb(11, 26, 66), Color.FromArgb(42, 71, 133), Color.FromArgb(245, 197, 66),
+        Color.FromArgb(207, 156, 30), Color.FromArgb(28, 59, 120), false);
 
     public static AppTheme Light => new(
-        Color.FromArgb(237, 234, 246), Color.FromArgb(222, 230, 240), Color.FromArgb(250, 250, 253),
-        Color.FromArgb(216, 218, 229), Color.FromArgb(36, 39, 55), Color.FromArgb(105, 109, 127),
-        Color.FromArgb(244, 245, 249), Color.FromArgb(209, 213, 224), Color.FromArgb(193, 137, 47),
-        Color.FromArgb(153, 103, 29), Color.FromArgb(225, 218, 240), true);
+        Color.FromArgb(238, 243, 253), Color.FromArgb(220, 230, 247), Color.FromArgb(255, 255, 255),
+        Color.FromArgb(198, 212, 236), Color.FromArgb(18, 32, 72), Color.FromArgb(91, 107, 144),
+        Color.FromArgb(245, 248, 254), Color.FromArgb(194, 209, 234), Color.FromArgb(185, 138, 23),
+        Color.FromArgb(142, 106, 16), Color.FromArgb(217, 228, 248), true);
 }

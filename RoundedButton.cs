@@ -11,6 +11,7 @@ internal sealed class RoundedButton : Control
     private Color _bottomColor = Color.FromArgb(188, 135, 53);
     private Color _borderColor = Color.FromArgb(255, 224, 157);
     private Color _textColor = Color.FromArgb(35, 29, 23);
+    private string? _iconGlyph;
 
     public RoundedButton()
     {
@@ -23,7 +24,7 @@ internal sealed class RoundedButton : Control
         AccessibleRole = AccessibleRole.PushButton;
         Cursor = Cursors.Hand;
         Font = new Font("Segoe UI Semibold", 10.5f, FontStyle.Bold, GraphicsUnit.Point);
-        MinimumSize = new Size(70, 40);
+        MinimumSize = new Size(48, 28);
     }
 
     public Color TopColor { get => _topColor; set { _topColor = value; Invalidate(); } }
@@ -31,6 +32,13 @@ internal sealed class RoundedButton : Control
     public Color BorderColor { get => _borderColor; set { _borderColor = value; Invalidate(); } }
     public Color TextColor { get => _textColor; set { _textColor = value; Invalidate(); } }
     public int CornerRadius { get; set; } = 15;
+
+    /// <summary>Glifo da fonte Segoe MDL2 Assets desenhado à esquerda do texto.</summary>
+    public string? IconGlyph
+    {
+        get => _iconGlyph;
+        set { _iconGlyph = string.IsNullOrEmpty(value) ? null : value; Invalidate(); }
+    }
 
     protected override void OnSizeChanged(EventArgs e)
     {
@@ -133,9 +141,35 @@ internal sealed class RoundedButton : Control
         }
         Rectangle textBounds = Rectangle.Round(bounds);
         textBounds.Inflate(-10, -3);
-        TextRenderer.DrawText(e.Graphics, Text, Font, textBounds, text,
-            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
-            TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+        const TextFormatFlags centered = TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
+            TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix;
+
+        if (_iconGlyph is null)
+        {
+            TextRenderer.DrawText(e.Graphics, Text, Font, textBounds, text, centered);
+            return;
+        }
+
+        // Ícone e texto são medidos juntos para que o par fique centralizado no botão.
+        float glyphSize = Math.Max(10f, Font.SizeInPoints * 1.15f);
+        using var glyphFont = new Font("Segoe MDL2 Assets", glyphSize, FontStyle.Regular, GraphicsUnit.Point);
+        Size glyph = TextRenderer.MeasureText(e.Graphics, _iconGlyph, glyphFont);
+        Size label = TextRenderer.MeasureText(e.Graphics, Text, Font, textBounds.Size,
+            TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
+        int spacing = Math.Max(6, (int)(glyphSize * 0.6f));
+        int total = Math.Min(textBounds.Width, glyph.Width + spacing + label.Width);
+        int left = textBounds.Left + (textBounds.Width - total) / 2;
+
+        var glyphBounds = new Rectangle(left, textBounds.Top, glyph.Width, textBounds.Height);
+        TextRenderer.DrawText(e.Graphics, _iconGlyph, glyphFont, glyphBounds, text,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+
+        var labelBounds = Rectangle.FromLTRB(glyphBounds.Right + spacing, textBounds.Top,
+            textBounds.Right, textBounds.Bottom);
+        if (labelBounds.Width > 0)
+            TextRenderer.DrawText(e.Graphics, Text, Font, labelBounds, text,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter |
+                TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
     }
 
     protected override void Dispose(bool disposing)
